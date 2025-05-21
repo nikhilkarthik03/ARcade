@@ -2,52 +2,47 @@ package com.flam.arcade.release.screens;
 
 import android.app.Activity;
 import android.content.Context;
-import android.os.Handler;
 import android.view.View;
-import android.webkit.WebView;
 import android.widget.FrameLayout;
 
 import com.flam.arcade.R;
 import com.google.ar.sceneform.ux.ArFragment;
 
+import java.io.IOException;
+
+import pl.droidsonroids.gif.GifDrawable;
+import pl.droidsonroids.gif.GifImageView;
+
 public class LandingScreen {
 
     public LandingScreen(Context context, ArFragment arFragment) {
-
-        WebView logoView = ((Activity) context).findViewById(R.id.logo);
         FrameLayout landingScreen = ((Activity) context).findViewById(R.id.LandingScreen);
         FrameLayout instructionsView = ((Activity) context).findViewById(R.id.instructionsView);
+        GifImageView gifImageView = ((Activity) context).findViewById(R.id.logo);
 
-        // Configure WebView for transparent GIF display
-        logoView.getSettings().setLoadWithOverviewMode(true);
-        logoView.getSettings().setUseWideViewPort(true);
-        logoView.getSettings().setJavaScriptEnabled(true);
-        logoView.setBackgroundColor(0x00000000); // Transparent background
+        try {
+            GifDrawable gifDrawable = new GifDrawable(context.getResources(), R.raw.logo);
+            gifDrawable.setLoopCount(1); // Play only once
+            gifImageView.setImageDrawable(gifDrawable);
+            gifDrawable.start(); // Ensure the animation starts
 
-        String gifPath = "file:///android_res/raw/logo.gif"; // if stored in res/raw
-        String htmlData = "<html><body style='margin:0;padding:0;'><img style='width:100%;height:auto;' src=\"" + gifPath + "\"></body></html>";
-        logoView.loadDataWithBaseURL("file:///android_res/raw/", htmlData, "text/html", "UTF-8", null);
+            gifDrawable.addAnimationListener(loopNumber -> {
+                if (loopNumber == 0) {
+                    // Remove landing screen
+                    if (landingScreen != null && landingScreen.getParent() instanceof FrameLayout) {
+                        ((FrameLayout) landingScreen.getParent()).removeView(landingScreen);
+                    }
 
-        // Delay and then remove the entire landing screen and show instructions
-        new Handler().postDelayed(() -> {
-            // Clean up WebView
-            logoView.loadUrl("about:blank");
-            logoView.clearHistory();
-            logoView.removeAllViews();
-            logoView.destroy();
+                    // Show instructions screen
+                    if (instructionsView != null) {
+                        instructionsView.setVisibility(View.VISIBLE);
+                        new Instructions(context, arFragment);
+                    }
+                }
+            });
 
-            // Remove LandingScreen container from root layout
-            if (landingScreen != null) {
-                ((FrameLayout) landingScreen.getParent()).removeView(landingScreen);
-            }
-
-            // Show instructions
-            if (instructionsView != null) {
-                instructionsView.setVisibility(View.VISIBLE);
-
-                new Instructions(context, arFragment);
-            }
-
-        }, 5000); // Delay in ms
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

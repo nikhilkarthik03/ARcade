@@ -53,4 +53,6 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     implementation("com.gorisse.thomas.sceneform:sceneform:1.23.0")
+    implementation("pl.droidsonroids.gif:android-gif-drawable:1.2.27")
+
 }

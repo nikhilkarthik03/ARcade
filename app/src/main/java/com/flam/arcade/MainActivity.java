@@ -1,5 +1,6 @@
 package com.flam.arcade;
 
+import android.media.MediaPlayer;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -28,9 +29,17 @@ public class MainActivity extends AppCompatActivity implements
     private ArFragment arFragment;
     private GameScreen gameScreen;
 
+    public MediaPlayer bgmPlayer;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        bgmPlayer = MediaPlayer.create(this, R.raw.bgm); // Use your filename
+        bgmPlayer.setLooping(true); // Optional: Loop BGM
+        bgmPlayer.setVolume(0.3f, 0.3f); // Optional: Set volume (left, right)
+
+        bgmPlayer.start();
         // Load models depending on build type
         if (BuildConfig.IS_DEBUG) {
             setContentView(R.layout.activity_test);
@@ -120,6 +129,7 @@ public class MainActivity extends AppCompatActivity implements
         // Pause all media when app is paused
         if (gameScreen != null) {
             gameScreen.pauseAllMedia();
+            bgmPlayer.pause();
         }
     }
 
@@ -128,7 +138,8 @@ public class MainActivity extends AppCompatActivity implements
         super.onResume();
         // Resume media when app comes back
         if (gameScreen != null) {
-            gameScreen.resumeAllMedia();
+//            gameScreen.resumeAllMedia();
+            bgmPlayer.start();
         }
     }
 
@@ -138,6 +149,12 @@ public class MainActivity extends AppCompatActivity implements
         // Release all media resources
         if (gameScreen != null) {
             gameScreen.releaseAllMedia();
+
+            if (bgmPlayer != null) {
+                bgmPlayer.stop();
+                bgmPlayer.release();
+                bgmPlayer = null;
+            }
         }
     }
 }

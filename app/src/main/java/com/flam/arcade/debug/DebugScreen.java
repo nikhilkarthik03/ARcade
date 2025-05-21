@@ -23,7 +23,7 @@ public class DebugScreen {
 
     private final Context context;
     private final ArFragment arFragment;
-    private static final String BURGER_MODEL = "models/Burger_Blast.glb";
+    private static final String BURGER_MODEL = "models/mcPuff.glb";
 
     public DebugScreen(Context context, ArFragment arFragment){
         this.context = context;

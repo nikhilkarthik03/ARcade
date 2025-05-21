@@ -13,7 +13,10 @@ import android.transition.TransitionManager;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationSet;
 import android.view.animation.OvershootInterpolator;
+import android.view.animation.ScaleAnimation;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -24,6 +27,7 @@ import android.widget.Toast;
 import androidx.annotation.DrawableRes;
 import androidx.core.content.res.ResourcesCompat;
 
+import com.flam.arcade.MainActivity;
 import com.flam.arcade.R;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.Pose;
@@ -39,6 +43,7 @@ import com.google.ar.sceneform.rendering.Renderable;
 import com.google.ar.sceneform.rendering.RenderableInstance;
 import com.google.ar.sceneform.ux.ArFragment;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +52,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+
+import pl.droidsonroids.gif.GifDrawable;
+import pl.droidsonroids.gif.GifImageView;
 
 public class GameScreen {
 
@@ -65,7 +73,7 @@ public class GameScreen {
     private final Handler imageChangeHandler = new Handler();
 
     // Reference to UI elements
-    private MediaPlayer tapSound, coinSound, countdownSound;
+    private MediaPlayer tapSound, countdownSound, changeSound;
     private int currentScore = 0;
     private CountDownTimer gameTimer;
     private int remainingGameTime = 0;
@@ -82,14 +90,12 @@ public class GameScreen {
     private static final String BURGER_MODEL = "models/Burger.glb";
     private static final String COKE = "models/Coke.glb";
     private static final String ICE_CREAM = "models/IceCream.glb";
-    private static final String WINGS = "models/ChickenTub.glb";
     private static final String MCPUFF = "models/mcPuff.glb";
+    private static final String FRIES = "models/Fries.glb";
     private static final String MCWRAP = "models/mcWrap.glb";
     private static final String NUGGET = "models/Nuggets.glb";
 
     private boolean hasPlacedModels = false;
-
-    private MediaPlayer bgmPlayer;
 
     ImageView restartButton;
 
@@ -102,17 +108,18 @@ public class GameScreen {
         scoreText = ((Activity) context).findViewById(R.id.scoreText);
         restartButton = ((Activity) context).findViewById(R.id.restartButton);
 
-        bgmPlayer = MediaPlayer.create(this.context, R.raw.bgm); // Use your filename
-        bgmPlayer.setLooping(true); // Optional: Loop BGM
-        bgmPlayer.setVolume(0.3f, 0.3f); // Optional: Set volume (left, right)
-
-        bgmPlayer.start();
+        ((MainActivity) context).bgmPlayer.setVolume(0.1f,0.1f);
 
 
         // Initialize the image to model map
         imageToModelMap.put(R.drawable.homebutton, BURGER_MODEL);
         imageToModelMap.put(R.drawable.coke, COKE);
         imageToModelMap.put(R.drawable.ice_cream, ICE_CREAM);
+        imageToModelMap.put(R.drawable.mc_wrap, MCWRAP);
+        imageToModelMap.put(R.drawable.fries, FRIES);
+        imageToModelMap.put(R.drawable.nuggets, NUGGET);
+//        imageToModelMap.put(R.drawable.mc_puff,MCPUFF);
+
 
         restartButton.setOnClickListener(v -> {
 
@@ -131,6 +138,8 @@ public class GameScreen {
                 BURGER_MODEL,
                 COKE,
                 ICE_CREAM,
+                NUGGET,
+                FRIES,
         };
 
         WeakReference<GameScreen> weakReference = new WeakReference<>(this);
@@ -198,7 +207,7 @@ public class GameScreen {
     }
 
     private void placeModelsAroundAnchor(AnchorNode anchorNode) {
-        List<Vector3> spherePoints = generateFrontArcPoints(20, 1.5f, 4f, 120, 180);
+        List<Vector3> spherePoints = generateFrontArcPoints(20, 1.5f, 5f, 150, 120);
 
         if (loadedModels.isEmpty()) {
             return;
@@ -241,6 +250,48 @@ public class GameScreen {
 
         ImageView homeIcon = ((Activity) context).findViewById(R.id.home);
         homeIcon.setImageResource(currentTargetImageId);
+
+        // Create and apply the scale animation
+        animateHomeIcon(homeIcon);
+    }
+
+    private void animateHomeIcon(ImageView homeIcon) {
+        // Create scale up animation
+        ScaleAnimation scaleUp = new ScaleAnimation(
+                1.0f, 1.2f, // Start and end X scale
+                1.0f, 1.2f, // Start and end Y scale
+                Animation.RELATIVE_TO_SELF, 0.0f, // Pivot X position (center)
+                Animation.RELATIVE_TO_SELF, 0.0f); // Pivot Y position (center)
+        scaleUp.setDuration(300); // Duration in milliseconds
+
+        // Create scale down animation
+        ScaleAnimation scaleDown = new ScaleAnimation(
+                1.2f, 1.0f, // Start and end X scale
+                1.2f, 1.0f, // Start and end Y scale
+                Animation.RELATIVE_TO_SELF, 0.0f, // Pivot X position (center)
+                Animation.RELATIVE_TO_SELF, 0.0f); // Pivot Y position (center)
+        scaleDown.setDuration(300); // Duration in milliseconds
+
+        // Create animation set
+        AnimationSet animationSet = new AnimationSet(true);
+        animationSet.addAnimation(scaleUp);
+
+        // Start scale down after scale up completes
+        scaleUp.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {}
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                homeIcon.startAnimation(scaleDown);
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {}
+        });
+
+        // Start the animation
+        homeIcon.startAnimation(scaleUp);
     }
 
     private void scheduleTargetImageRotation() {
@@ -249,14 +300,20 @@ public class GameScreen {
             public void run() {
                 if (!isGameActive) return;
 
+                changeSound = MediaPlayer.create(context, R.raw.change);
+                changeSound.setLooping(false);
+                changeSound.setVolume(0.75f, 0.75f);
+                changeSound.start();
+
                 randomizeTargetImage(); // change the image
 
-                // Schedule next run randomly between 3-4 seconds
-                int delay = 3000 + (int)(Math.random() * 1000); // 3000-4000ms
+                // Schedule next run randomly between 7–8 seconds (7000–8000 ms)
+                int delay = 7000 + (int)(Math.random() * 1000);
                 imageChangeHandler.postDelayed(this, delay);
             }
-        }, 1000); // initial delay before first change
+        }, 7000); // initial delay before first change
     }
+
 
     private void animateNodeScaleAndRemove(Node node) {
         if (tappedNodes.contains(node)) return;
@@ -275,15 +332,15 @@ public class GameScreen {
         String correctModel = imageToModelMap.get(currentTargetImageId);
         if (correctModel != null && correctModel.equals(modelType)) {
             points = 100;
-            tapSound = MediaPlayer.create(this.context, R.raw.pos);
+            tapSound = MediaPlayer.create(this.context, R.raw.correct);
             tapSound.setLooping(false);
-            tapSound.setVolume(1f, 1f);
+            tapSound.setVolume(0.75f, 0.75f);
             tapSound.start();
         } else {
             points = -50;
-            tapSound = MediaPlayer.create(this.context, R.raw.neg);
+            tapSound = MediaPlayer.create(this.context, R.raw.error);
             tapSound.setLooping(false);
-            tapSound.setVolume(1f, 1f);
+            tapSound.setVolume(0.75f, 0.75f);
             tapSound.start();
         }
 
@@ -475,7 +532,7 @@ public class GameScreen {
                 isGameActive = false;
                 clearAllNodes();
 
-                bgmPlayer.pause();
+                ((MainActivity) context).bgmPlayer.pause();
 
                 MediaPlayer endSound;
                 endSound = MediaPlayer.create(context, R.raw.win);
@@ -524,13 +581,13 @@ public class GameScreen {
 
         // Animate stars based on score thresholds
         if (score >= 500) {
-            animateStar(star1, 0);
+            animateStar(star1, 0, 340);
 
             if (score >= 1250) {
-                animateStar(star2, 300);
+                animateStar(star2, 300, 360);
 
                 if (score >= 2000) {
-                    animateStar(star3, 600);
+                    animateStar(star3, 600, 380);
                 }
             }
         }
@@ -542,7 +599,7 @@ public class GameScreen {
      * @param star The ImageView of the star to animate
      * @param delay Delay before starting the animation in milliseconds
      */
-    private void animateStar(ImageView star, long delay) {
+    private void animateStar(ImageView star, long delay, int rotation) {
         star.setVisibility(View.VISIBLE);
 
         // Create scaling animation
@@ -556,7 +613,7 @@ public class GameScreen {
 
         // Optional: Add rotation animation for more flair
         star.animate()
-                .rotation(360)
+                .rotation(rotation)
                 .setDuration(800)
                 .setStartDelay(delay)
                 .start();
@@ -573,27 +630,26 @@ public class GameScreen {
         activity.findViewById(R.id.restartButton).setVisibility(View.VISIBLE);
         activity.findViewById(R.id.confetti).setVisibility(View.VISIBLE);
 
-        WebView confettiView = activity.findViewById(R.id.confetti);
+        GifImageView confettiView = activity.findViewById(R.id.confetti);
+        confettiView.setVisibility(View.VISIBLE);
 
-        confettiView.getSettings().setLoadWithOverviewMode(true);
-        confettiView.getSettings().setUseWideViewPort(true);
-        confettiView.getSettings().setJavaScriptEnabled(true);
-        confettiView.setBackgroundColor(0x00000000); // Transparent background
-        String imagePath = "file:///android_res/raw/confetti.gif";
+        if (currentScore > 500) {
+            try {
+                GifDrawable confettiDrawable = new GifDrawable(context.getResources(), R.raw.confetti);
+                confettiDrawable.setLoopCount(1); // Play once
+                confettiView.setImageDrawable(confettiDrawable);
+                confettiView.setVisibility(View.VISIBLE);
+                confettiDrawable.start();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            // Set image resource directly for PNG
+            confettiView.setImageResource(R.drawable.fail);
+            confettiView.setVisibility(View.VISIBLE);
+        }
 
-        String htmlData = "<html>" +
-                "<head>" +
-                "<style>" +
-                "html, body { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: transparent; }" +
-                "img { height: 100%; width: 100%; object-fit: cover; }" +
-                "</style>" +
-                "</head>" +
-                "<body>" +
-                "<img src=\"" + imagePath + "\" />" +
-                "</body>" +
-                "</html>";
 
-        confettiView.loadDataWithBaseURL(null, htmlData, "text/html", "UTF-8", null);
 
         ImageView scorecard = activity.findViewById(R.id.gamescore);
         TextView scoreText = activity.findViewById(R.id.scoreText);
@@ -635,6 +691,8 @@ public class GameScreen {
         Toast toast = Toast.makeText(context, "BONUS: +" + seconds + " seconds!", Toast.LENGTH_LONG);
         View view = toast.getView();
 
+        countdownSound.pause();
+
         // Customize toast appearance if available on this Android version
         if (view != null) {
             // Set a background color
@@ -664,12 +722,9 @@ public class GameScreen {
     public void restart() {
         Activity activity = (Activity) context;
 
-        bgmPlayer.start();
+        ((MainActivity) context).bgmPlayer.start();
+        activity.findViewById(R.id.confetti).setVisibility(View.GONE);
 
-        WebView confettiView = activity.findViewById(R.id.confetti);
-        confettiView.loadUrl("about:blank");
-        confettiView.clearHistory();
-        confettiView.setVisibility(View.GONE);
 
         // Clear the scene
         clearAllNodes();
@@ -795,7 +850,10 @@ public class GameScreen {
             float pitch = (rand.nextFloat() - 0.5f) * verticalArcRadians;
 
             // Random distance
-            float distance = minDistance + rand.nextFloat() * (maxDistance - minDistance);
+            float step = 0.5f;
+            int steps = (int) ((maxDistance - minDistance) / step);
+            int randomStep = rand.nextInt(steps + 1); // +1 to include maxDistance
+            float distance = minDistance + randomStep * step;
 
             // Direction (facing -Z)
             float x = (float)(Math.cos(pitch) * Math.sin(yaw));
@@ -826,27 +884,6 @@ public class GameScreen {
         return new Vector3(v.x * scalar, v.y * scalar, v.z * scalar);
     }
 
-
-
-    private List<Vector3> generateSpherePoints(int count, float radius) {
-        List<Vector3> points = new ArrayList<>();
-        double offset = 2.0 / count;
-        double increment = Math.PI * (3.0 - Math.sqrt(5.0));
-
-        for (int i = 0; i < count; i++) {
-            double y = ((i * offset) - 1) + (offset / 2);
-            double r = Math.sqrt(1 - y * y);
-            double phi = i * increment;
-
-            double x = Math.cos(phi) * r;
-            double z = Math.sin(phi) * r;
-
-            points.add(new Vector3((float) (x * radius), (float) (y * radius), (float) (z * radius)));
-        }
-
-        return points;
-    }
-
     public void cleanup() {
         isGameActive = false;
 
@@ -874,17 +911,13 @@ public class GameScreen {
      */
     public void pauseAllMedia() {
         // Pause background music if it's playing
-        if (bgmPlayer != null && bgmPlayer.isPlaying()) {
-            bgmPlayer.pause();
+        if (changeSound != null && changeSound.isPlaying()) {
+            changeSound.pause();
         }
 
         // Pause any active sound effects
         if (tapSound != null && tapSound.isPlaying()) {
             tapSound.pause();
-        }
-
-        if (coinSound != null && coinSound.isPlaying()) {
-            coinSound.pause();
         }
 
         if (countdownSound != null && countdownSound.isPlaying()) {
@@ -896,14 +929,14 @@ public class GameScreen {
      * Resumes background music when returning to the game.
      * Call this when the app comes back to foreground.
      */
-    public void resumeAllMedia() {
-        // Only resume background music if the game is active
-        if (isGameActive && bgmPlayer != null && !bgmPlayer.isPlaying()) {
-            bgmPlayer.start();
-        }
-
-        // Generally don't resume sound effects as they're one-shot sounds
-    }
+//    public void resumeAllMedia() {
+//        // Only resume background music if the game is active
+//        if (isGameActive && bgmPlayer != null && !bgmPlayer.isPlaying()) {
+//            bgmPlayer.start();
+//        }
+//
+//        // Generally don't resume sound effects as they're one-shot sounds
+//    }
 
     /**
      * Releases all media player resources.
@@ -911,21 +944,16 @@ public class GameScreen {
      */
     public void releaseAllMedia() {
         // Release background music
-        if (bgmPlayer != null) {
-            bgmPlayer.stop();
-            bgmPlayer.release();
-            bgmPlayer = null;
+        if (changeSound != null) {
+            changeSound.stop();
+            changeSound.release();
+            changeSound = null;
         }
 
         // Release sound effects
         if (tapSound != null) {
             tapSound.release();
             tapSound = null;
-        }
-
-        if (coinSound != null) {
-            coinSound.release();
-            coinSound = null;
         }
 
         if (countdownSound != null) {

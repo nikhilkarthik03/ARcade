@@ -3,7 +3,6 @@ package com.flam.arcade.release.screens;
 import android.app.Activity;
 import android.content.Context;
 import android.view.View;
-import android.webkit.WebView;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
@@ -11,72 +10,116 @@ import com.flam.arcade.MainActivity;
 import com.flam.arcade.R;
 import com.google.ar.sceneform.ux.ArFragment;
 
+import java.io.IOException;
+
+import pl.droidsonroids.gif.GifDrawable;
+import pl.droidsonroids.gif.GifImageView;
+
 public class Instructions {
 
     private int step = 0;
+    private Context context;
+    private ArFragment arFragment;
+
+    private FrameLayout container;
+    private FrameLayout gameView;
+    private GifImageView gifImageView;
+    private ImageView nextButton;
 
     public Instructions(Context context, ArFragment arFragment) {
+        this.context = context;
+        this.arFragment = arFragment;
         Activity activity = (Activity) context;
 
-        WebView instructionsView = activity.findViewById(R.id.instructions);
-        ImageView nextButton = activity.findViewById(R.id.nextButton);
-        FrameLayout container = activity.findViewById(R.id.instructionsView);
-        FrameLayout gameView = activity.findViewById(R.id.gameScreen);
+        container = activity.findViewById(R.id.instructionsView);
+        gameView = activity.findViewById(R.id.gameScreen);
+        gifImageView = activity.findViewById(R.id.gifImageView);
+        nextButton = activity.findViewById(R.id.nextButton);
 
-        // Show the container
+        nextButton.setVisibility(View.GONE);
         container.setVisibility(View.VISIBLE);
 
-        // Configure WebView
-        instructionsView.getSettings().setLoadWithOverviewMode(true);
-        instructionsView.getSettings().setUseWideViewPort(true);
-        instructionsView.getSettings().setJavaScriptEnabled(true);
-        instructionsView.setBackgroundColor(0x00000000); // Transparent background
+        // Set listener here AFTER nextButton is initialized
+        nextButton.setOnClickListener(v -> {
+            step++;
+            switch (step) {
+                case 2:
+                    playTrayGif();
+                    nextButton.setImageResource(R.drawable.play_button);
+                    break;
 
-        // STEP 0: Start with fries.gif
-        loadWebViewContent(instructionsView, "file:///android_res/raw/fries.gif");
+                case 3:
+                    container.setVisibility(View.GONE);
+                    gameView.setVisibility(View.VISIBLE);
 
-        // Handle button click logic
-        nextButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                step++;
+                    GameScreen gameScreen = new GameScreen(context, arFragment);
 
-                switch (step) {
-                    case 1:
-                        // STEP 1: Show instructions.png
-                        loadWebViewContent(instructionsView, "file:///android_res/drawable/instructions.png");
-                        break;
+                    if (context instanceof MainActivity) {
+                        ((MainActivity) context).setGameScreen(gameScreen);
+                    }
 
-                    case 2:
-                        // STEP 2: Show tray.gif and update button to "Play"
-                        loadWebViewContent(instructionsView, "file:///android_res/raw/tray.gif");
-                        nextButton.setImageResource(R.drawable.play_button);
-                        break;
-
-                    case 3:
-                        // STEP 3: Hide everything and start GameScreen
-                        container.removeAllViews();
-                        container.setVisibility(View.GONE);
-                        gameView.setVisibility(View.VISIBLE);
-
-                        GameScreen gameScreen = new GameScreen(context, arFragment);
-
-                        // Store reference to the game screen in MainActivity for lifecycle management
-                        if (context instanceof MainActivity) {
-                            ((MainActivity) context).setGameScreen(gameScreen);
-                        }
-
-                        gameScreen.loadModels();
-                        gameScreen.startGameTimer(45);
-                        break;
-                }
+                    gameScreen.loadModels();
+                    gameScreen.startGameTimer(45);
+                    break;
             }
         });
+
+        playFirstGifOnce();
     }
 
-    private void loadWebViewContent(WebView webView, String imagePath) {
-        String htmlData = "<html><body style='margin:0;padding:0;'><img style='width:100%;height:auto;' src=\"" + imagePath + "\"></body></html>";
 
-        webView.loadDataWithBaseURL(null, htmlData, "text/html", "UTF-8", null);
+    private void playFirstGifOnce() {
+        try {
+            GifDrawable gifDrawable = new GifDrawable(context.getResources(), R.raw.fries);
+            gifDrawable.setLoopCount(1);
+            gifImageView.setImageDrawable(gifDrawable);
+            gifImageView.setVisibility(View.VISIBLE);
+            nextButton.setVisibility(View.GONE);
+
+            // Set width to match_parent initially
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) gifImageView.getLayoutParams();
+            params.width = FrameLayout.LayoutParams.MATCH_PARENT;
+            gifImageView.setLayoutParams(params);
+
+            gifDrawable.start();
+
+            gifDrawable.addAnimationListener(loopNumber -> {
+                if (loopNumber == 0) {
+                    // After first GIF completes, switch to static instructions and resize
+                    gifImageView.setVisibility(View.GONE);
+                    showStaticInstructions();
+                    nextButton.setVisibility(View.VISIBLE);
+                    step = 1;
+                }
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
+    private void showStaticInstructions() {
+        // Resize gifImageView to 300sp width
+        int widthInPx = (int) (300 * context.getResources().getDisplayMetrics().scaledDensity); // 300sp to px
+
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) gifImageView.getLayoutParams();
+        params.width = widthInPx;
+        gifImageView.setLayoutParams(params);
+
+        gifImageView.setImageResource(R.drawable.instructions);
+        gifImageView.setVisibility(View.VISIBLE);
+    }
+
+
+    private void playTrayGif() {
+        try {
+            GifDrawable gifDrawable = new GifDrawable(context.getResources(), R.raw.tray);
+            gifDrawable.setLoopCount(0); // infinite or set to 1 for once
+            gifImageView.setImageDrawable(gifDrawable);
+            gifImageView.setVisibility(View.VISIBLE);
+            gifDrawable.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
