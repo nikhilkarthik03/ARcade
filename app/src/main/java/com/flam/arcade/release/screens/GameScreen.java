@@ -79,7 +79,7 @@ public class GameScreen {
     private int remainingGameTime = 0;
 
     private final TextView timerText;
-    private final TextView scoreText;
+    private final TextView scoreText, scoreTextFinal;
 
     private int currentTargetImageId = -1; // holds the currently displayed image drawable id
 
@@ -97,7 +97,7 @@ public class GameScreen {
 
     private boolean hasPlacedModels = false;
 
-    ImageView restartButton;
+    ImageView restartButtonLoss, restartButtonWin;
 
     public GameScreen(Context context, ArFragment arFragment) {
         this.context = context;
@@ -106,10 +106,11 @@ public class GameScreen {
         // Set up UI references
         timerText = ((Activity) context).findViewById(R.id.timerText);
         scoreText = ((Activity) context).findViewById(R.id.scoreText);
-        restartButton = ((Activity) context).findViewById(R.id.restartButton);
+        restartButtonLoss = ((Activity) context).findViewById(R.id.restartButton_loss);
+        restartButtonWin = ((Activity) context).findViewById(R.id.restartButton_win);
 
         ((MainActivity) context).bgmPlayer.setVolume(0.1f,0.1f);
-
+        scoreTextFinal = ((Activity) context).findViewById(R.id.scoreText_final);
 
         // Initialize the image to model map
         imageToModelMap.put(R.drawable.homebutton, BURGER_MODEL);
@@ -121,11 +122,45 @@ public class GameScreen {
 //        imageToModelMap.put(R.drawable.mc_puff,MCPUFF);
 
 
-        restartButton.setOnClickListener(v -> {
+        restartButtonWin.setOnClickListener(v -> {
+            Activity activity = (Activity) context;
 
-                restart();
-                startGameTimer(45);
-                arFragment.getArSceneView().getScene().addOnUpdateListener(this::onSceneUpdate);
+            ((MainActivity) context).bgmPlayer.start();
+            activity.findViewById(R.id.gameScreen).setVisibility(View.VISIBLE);
+            activity.findViewById(R.id.win_screen).setVisibility(View.GONE);
+            activity.findViewById(R.id.confetti).setVisibility(View.GONE);
+            startGameTimer(45);
+
+            clearAllNodes();
+            currentScore = 0;
+            updateScoreText();
+            tappedNodes.clear();
+            remainingGameTime = 0;
+            isGameActive = true;
+            hasPlacedModels = false;
+            scoreTextFinal.setText(String.valueOf(0));
+
+            arFragment.getArSceneView().getScene().addOnUpdateListener(this::onSceneUpdate);
+
+        });
+
+        restartButtonLoss.setOnClickListener(v -> {
+            Activity activity = (Activity) context;
+
+            ((MainActivity) context).bgmPlayer.start();
+            activity.findViewById(R.id.gameScreen).setVisibility(View.VISIBLE);
+            activity.findViewById(R.id.loss_screen).setVisibility(View.GONE);
+            startGameTimer(45);
+
+            clearAllNodes();
+            currentScore = 0;
+            updateScoreText();
+            tappedNodes.clear();
+            remainingGameTime = 0;
+            isGameActive = true;
+            hasPlacedModels = false;
+
+            arFragment.getArSceneView().getScene().addOnUpdateListener(this::onSceneUpdate);
 
         });
 
@@ -140,6 +175,7 @@ public class GameScreen {
                 ICE_CREAM,
                 NUGGET,
                 FRIES,
+                MCWRAP
         };
 
         WeakReference<GameScreen> weakReference = new WeakReference<>(this);
@@ -338,6 +374,7 @@ public class GameScreen {
             tapSound.start();
         } else {
             points = -50;
+            ((MainActivity) context).shakeItBaby();
             tapSound = MediaPlayer.create(this.context, R.raw.error);
             tapSound.setLooping(false);
             tapSound.setVolume(0.75f, 0.75f);
@@ -403,24 +440,6 @@ public class GameScreen {
     }
 
 
-
-    private float[] worldToScreen(ArFragment arFragment, Vector3 worldPos) {
-        Session session = arFragment.getArSceneView().getSession();
-        if (session == null) return null;
-
-        float[] world = new float[]{ worldPos.x, worldPos.y, worldPos.z };
-        float[] ndc = new float[4];
-        float[] screenPos = new float[2];
-
-        Camera camera = arFragment.getArSceneView().getScene().getCamera();
-        Vector3 screen = camera.worldToScreenPoint(worldPos);
-        screenPos[0] = screen.x;
-        screenPos[1] = screen.y;
-        return screenPos;
-    }
-
-
-
     private void removeNodeAndRespawn(Node node, Vector3 position, AnchorNode parentAnchor) {
         node.setParent(null);
         sceneNodes.remove(node);
@@ -458,14 +477,6 @@ public class GameScreen {
             addBonusTime(15);
             showBonusTimeToast(15);
         }
-
-//        // Play coin sound
-//        if (points > 0) {
-//            coinSound = MediaPlayer.create(this.context, R.raw.coins);
-//            coinSound.setLooping(false);
-//            coinSound.setVolume(0.7f, 0.7f);
-//            coinSound.start();
-//        }
     }
 
     private void updateScoreText() {
@@ -539,9 +550,31 @@ public class GameScreen {
                 endSound.setLooping(false);
                 endSound.setVolume(0.5f, 0.5f);
                 endSound.start();
+                ((MainActivity) context).shakeItBaby();
+                Activity activity = (Activity) context;
+                activity.findViewById(R.id.gameScreen).setVisibility(View.GONE);
+                if (currentScore < 500){
+                    activity.findViewById(R.id.loss_screen).setVisibility(View.VISIBLE);
+                }else{
+                    activity.findViewById(R.id.win_screen).setVisibility(View.VISIBLE);
+                    animateStars();
+                    GifImageView confettiView = ((Activity) context).findViewById(R.id.confetti);
+                    confettiView.setVisibility(View.VISIBLE);
+                    confettiView.setScaleX(1.5f);
+                    confettiView.setScaleY(1.5f);
 
-                // Show final score UI
-                showFinalScoreUI();
+                    scoreTextFinal.setText(String.valueOf(currentScore));
+
+                    try {
+                        GifDrawable confettiDrawable = new GifDrawable(context.getResources(), R.raw.confetti);
+                        confettiDrawable.setLoopCount(1); // Play once
+                        confettiView.setImageDrawable(confettiDrawable);
+                        confettiView.setVisibility(View.VISIBLE);
+                        confettiDrawable.start();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         }.start();
     }
@@ -619,70 +652,6 @@ public class GameScreen {
                 .start();
     }
 
-    private void showFinalScoreUI() {
-        Activity activity = (Activity) context;
-
-        animateStars();
-
-        // Hide other UI elements
-        activity.findViewById(R.id.gameHelper).setVisibility(View.GONE);
-        activity.findViewById(R.id.endScreen).setVisibility(View.VISIBLE);
-        activity.findViewById(R.id.restartButton).setVisibility(View.VISIBLE);
-        activity.findViewById(R.id.confetti).setVisibility(View.VISIBLE);
-
-        GifImageView confettiView = activity.findViewById(R.id.confetti);
-        confettiView.setVisibility(View.VISIBLE);
-
-        if (currentScore > 500) {
-            try {
-                GifDrawable confettiDrawable = new GifDrawable(context.getResources(), R.raw.confetti);
-                confettiDrawable.setLoopCount(1); // Play once
-                confettiView.setImageDrawable(confettiDrawable);
-                confettiView.setVisibility(View.VISIBLE);
-                confettiDrawable.start();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else {
-            // Set image resource directly for PNG
-            confettiView.setImageResource(R.drawable.fail);
-            confettiView.setVisibility(View.VISIBLE);
-        }
-
-
-
-        ImageView scorecard = activity.findViewById(R.id.gamescore);
-        TextView scoreText = activity.findViewById(R.id.scoreText);
-
-        scorecard.setVisibility(View.VISIBLE);
-        scoreText.setVisibility(View.VISIBLE);
-
-        // Get layout params
-        RelativeLayout.LayoutParams paramsScorecard = (RelativeLayout.LayoutParams) scorecard.getLayoutParams();
-        RelativeLayout.LayoutParams paramsScoreText = (RelativeLayout.LayoutParams) scoreText.getLayoutParams();
-
-        // Convert to bigger size
-        paramsScorecard.width = (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 180, scorecard.getResources().getDisplayMetrics());
-
-        // Begin transition animation
-        ViewGroup parent = (ViewGroup) scorecard.getParent();
-        TransitionManager.beginDelayedTransition(parent);
-
-        // Update layout rules
-        paramsScorecard.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-        paramsScorecard.removeRule(RelativeLayout.ALIGN_PARENT_END);
-        paramsScorecard.addRule(RelativeLayout.CENTER_HORIZONTAL); // center scorecard
-
-        scorecard.setLayoutParams(paramsScorecard);
-
-        // Update scoreText layout
-        paramsScoreText.removeRule(RelativeLayout.ALIGN_BOTTOM);
-        paramsScoreText.addRule(RelativeLayout.CENTER_VERTICAL);
-        scoreText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-        scoreText.setLayoutParams(paramsScoreText);
-    }
-
     /**
      * Shows a special toast for bonus time
      * @param seconds Number of seconds added
@@ -690,8 +659,6 @@ public class GameScreen {
     private void showBonusTimeToast(int seconds) {
         Toast toast = Toast.makeText(context, "BONUS: +" + seconds + " seconds!", Toast.LENGTH_LONG);
         View view = toast.getView();
-
-        countdownSound.pause();
 
         // Customize toast appearance if available on this Android version
         if (view != null) {
@@ -717,70 +684,6 @@ public class GameScreen {
             colorAnim.setRepeatCount(1);
             colorAnim.start();
         }
-    }
-
-    public void restart() {
-        Activity activity = (Activity) context;
-
-        ((MainActivity) context).bgmPlayer.start();
-        activity.findViewById(R.id.confetti).setVisibility(View.GONE);
-
-
-        // Clear the scene
-        clearAllNodes();
-
-        // Reset score
-        currentScore = 0;
-        updateScoreText();
-
-        // Reset tapped nodes tracking
-        tappedNodes.clear();
-
-        // Reset remaining time
-        remainingGameTime = 0;
-
-        // Set game as active
-        isGameActive = true;
-
-        // Reset UI elements
-        activity.findViewById(R.id.gameHelper).setVisibility(View.VISIBLE);
-        activity.findViewById(R.id.endScreen).setVisibility(View.GONE);
-        activity.findViewById(R.id.restartButton).setVisibility(View.GONE);
-
-        ImageView scorecard = activity.findViewById(R.id.gamescore);
-        TextView scoreText = activity.findViewById(R.id.scoreText);
-
-        // Get layout params
-        RelativeLayout.LayoutParams paramsScorecard = (RelativeLayout.LayoutParams) scorecard.getLayoutParams();
-        RelativeLayout.LayoutParams paramsScoreText = (RelativeLayout.LayoutParams) scoreText.getLayoutParams();
-
-        // Convert to original size
-        paramsScorecard.width = (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 160, scorecard.getResources().getDisplayMetrics());
-
-        // Begin transition animation
-        ViewGroup parent = (ViewGroup) scorecard.getParent();
-        TransitionManager.beginDelayedTransition(parent);
-
-        // Update layout rules
-        paramsScorecard.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-        paramsScorecard.addRule(RelativeLayout.ALIGN_PARENT_END);
-        paramsScorecard.removeRule(RelativeLayout.CENTER_HORIZONTAL);
-
-        scorecard.setLayoutParams(paramsScorecard);
-
-        // Update scoreText layout
-        paramsScoreText.addRule(RelativeLayout.ALIGN_BOTTOM, R.id.gamescore);
-        paramsScoreText.removeRule(RelativeLayout.CENTER_VERTICAL);
-        scoreText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
-        paramsScoreText.bottomMargin = (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP, 10, scorecard.getResources().getDisplayMetrics());
-
-        scoreText.setLayoutParams(paramsScoreText);
-
-        // Create new models
-        hasPlacedModels = false;
-        arFragment.getArSceneView().getScene().addOnUpdateListener(this::onSceneUpdate);
     }
 
     public void clearAllNodes() {

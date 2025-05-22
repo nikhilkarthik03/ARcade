@@ -1,7 +1,11 @@
 package com.flam.arcade;
 
+import android.annotation.SuppressLint;
 import android.media.MediaPlayer;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -155,6 +159,15 @@ public class MainActivity extends AppCompatActivity implements
                 bgmPlayer.release();
                 bgmPlayer = null;
             }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    public void shakeItBaby() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            ((Vibrator) this.getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE));
+        } else {
+            ((Vibrator) this.getSystemService(VIBRATOR_SERVICE)).vibrate(150);
         }
     }
 }

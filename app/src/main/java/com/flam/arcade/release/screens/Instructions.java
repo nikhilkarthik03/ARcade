@@ -2,6 +2,7 @@ package com.flam.arcade.release.screens;
 
 import android.app.Activity;
 import android.content.Context;
+import android.os.Handler;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -83,15 +84,13 @@ public class Instructions {
 
             gifDrawable.start();
 
-            gifDrawable.addAnimationListener(loopNumber -> {
-                if (loopNumber == 0) {
-                    // After first GIF completes, switch to static instructions and resize
-                    gifImageView.setVisibility(View.GONE);
-                    showStaticInstructions();
-                    nextButton.setVisibility(View.VISIBLE);
-                    step = 1;
-                }
-            });
+            new Handler().postDelayed(() -> {
+                gifImageView.setVisibility(View.GONE);
+                showStaticInstructions();
+                nextButton.setVisibility(View.VISIBLE);
+                step = 1;
+            },3000);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
