@@ -280,16 +280,42 @@ public class GameScreen {
     }
 
     private void randomizeTargetImage() {
-        List<Integer> drawableIds = new ArrayList<>(imageToModelMap.keySet());
-        int randomIndex = (int) (Math.random() * drawableIds.size());
-        currentTargetImageId = drawableIds.get(randomIndex);
+        // Step 1: Filter visible/rendered nodes
+        List<Map.Entry<Node, String>> renderedEntries = new ArrayList<>();
+        for (Map.Entry<Node, String> entry : nodeModelTypeMap.entrySet()) {
+            Node node = entry.getKey();
+            if (node != null && node.isEnabled()) {
+                renderedEntries.add(entry);
+            }
+        }
 
-        ImageView homeIcon = ((Activity) context).findViewById(R.id.home);
-        homeIcon.setImageResource(currentTargetImageId);
+        // Step 2: Pick a random rendered node
+        if (!renderedEntries.isEmpty()) {
+            int randomIndex = (int) (Math.random() * renderedEntries.size());
+            String selectedModelType = renderedEntries.get(randomIndex).getValue();
 
-        // Create and apply the scale animation
-        animateHomeIcon(homeIcon);
+            // Step 3: Find corresponding drawable ID
+            Integer matchingDrawableId = null;
+            for (Map.Entry<Integer, String> entry : imageToModelMap.entrySet()) {
+                if (entry.getValue().equals(selectedModelType)) {
+                    matchingDrawableId = entry.getKey();
+                    break;
+                }
+            }
+
+            // Step 4: Apply to ImageView if a matching drawable was found
+            if (matchingDrawableId != null) {
+                currentTargetImageId = matchingDrawableId;
+
+                ImageView homeIcon = ((Activity) context).findViewById(R.id.home);
+                homeIcon.setImageResource(currentTargetImageId);
+
+                // Step 5: Animate
+                animateHomeIcon(homeIcon);
+            }
+        }
     }
+
 
     private void animateHomeIcon(ImageView homeIcon) {
         // Create scale up animation
